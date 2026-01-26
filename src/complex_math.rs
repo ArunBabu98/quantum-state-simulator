@@ -42,7 +42,8 @@ fn complex_mul_conj_is_real() {
 
 /* -------------------------End tests------------------------ */
 
-struct Complex {
+#[derive(Clone, Copy)]
+pub struct Complex {
     re: f64,
     im: f64,
 }
@@ -61,6 +62,13 @@ impl Complex {
 
     pub fn abs2(&self) -> f64 {
         (self.re.powi(2) + self.im.powi(2)).abs()
+    }
+
+    pub fn scale(&self, factor: f64) -> Complex {
+        Complex {
+            re: self.re * factor,
+            im: self.im * factor,
+        }
     }
 }
 
