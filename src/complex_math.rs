@@ -16,6 +16,8 @@ Invariant:
 
 /* ---------------------------tests------------------------ */
 
+use std::ops::{Add, Mul, Sub};
+
 #[test]
 fn complex_conjugate() {
     let z = Complex::new(3.0, 4.0);
@@ -33,7 +35,8 @@ fn complex_abs2() {
 #[test]
 fn complex_mul_conj_is_real() {
     let z = Complex::new(1.2, -0.7);
-    let p = z * z.conj();
+    let conj = z.conj();
+    let p = z * conj;
     assert!(p.im.abs() < 1e-10);
 }
 
@@ -58,5 +61,30 @@ impl Complex {
 
     pub fn abs2(&self) -> f64 {
         (self.re.powi(2) + self.im.powi(2)).abs()
+    }
+}
+
+impl Add for Complex {
+    type Output = Self;
+    fn add(self, rhs: Self) -> Self {
+        Self::new(self.re + rhs.re, self.im + rhs.im)
+    }
+}
+
+impl Sub for Complex {
+    type Output = Self;
+    fn sub(self, rhs: Self) -> Self {
+        Self::new(self.re - rhs.re, self.im - rhs.im)
+    }
+}
+
+impl Mul for Complex {
+    type Output = Self;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        Complex {
+            re: self.re * rhs.re - self.im * rhs.im,
+            im: self.re * rhs.im + self.im * rhs.re,
+        }
     }
 }
