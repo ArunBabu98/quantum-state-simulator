@@ -44,8 +44,8 @@ fn complex_mul_conj_is_real() {
 
 #[derive(Clone, Copy)]
 pub struct Complex {
-    re: f64,
-    im: f64,
+    pub re: f64,
+    pub im: f64,
 }
 
 impl Complex {

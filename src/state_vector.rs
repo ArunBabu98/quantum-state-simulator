@@ -14,6 +14,22 @@ fn normalization_works() {
     assert!((psi.norm2() - 1.0).abs() < 1e-10);
 }
 
+#[test]
+fn inner_product_self_is_one() {
+    let psi = StateVec::basis_zero();
+    let ip = psi.inner(&psi);
+    assert!((ip.re - 1.0).abs() < 1e-10);
+    assert!(ip.im.abs() < 1e-10);
+}
+
+#[test]
+fn basis_states_are_orthogonal() {
+    let zero = StateVec::basis_zero();
+    let one = StateVec::basis_one();
+    let ip = zero.inner(&one);
+    assert!(ip.abs2() < 1e-10);
+}
+
 pub struct StateVec {
     data: Vec<Complex>,
 }
@@ -34,5 +50,23 @@ impl StateVec {
             self.data[0] = self.data[0].scale(inv);
             self.data[1] = self.data[1].scale(inv);
         }
+    }
+
+    pub fn basis_zero() -> Self {
+        Self {
+            data: vec![Complex::new(1.0, 0.0), Complex::new(0.0, 0.0)],
+        }
+    }
+
+    pub fn basis_one() -> Self {
+        Self {
+            data: vec![Complex::new(0.0, 0.0), Complex::new(1.0, 0.0)],
+        }
+    }
+
+    pub fn inner(&self, rhs: &StateVec) -> Complex {
+        let bra = self.data[0].conj() * rhs.data[0];
+        let ket = self.data[1].conj() * rhs.data[1];
+        bra + ket
     }
 }
