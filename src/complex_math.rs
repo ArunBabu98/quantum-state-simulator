@@ -70,6 +70,9 @@ impl Complex {
             im: self.im * factor,
         }
     }
+    pub fn approx_eq(&self, other: &Complex, epsilon: f64) -> bool {
+        (self.re - other.re).abs() < epsilon && (self.im - other.im).abs() < epsilon
+    }
 }
 
 impl Add for Complex {

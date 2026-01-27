@@ -31,7 +31,7 @@ fn basis_states_are_orthogonal() {
 }
 
 pub struct StateVec {
-    data: Vec<Complex>,
+    pub data: Vec<Complex>,
 }
 
 impl StateVec {
@@ -68,5 +68,23 @@ impl StateVec {
         let bra = self.data[0].conj() * rhs.data[0];
         let ket = self.data[1].conj() * rhs.data[1];
         bra + ket
+    }
+    pub fn approx_eq(&self, other: &StateVec) -> bool {
+        let epsilon = 1e-10; // Standard tolerance for quantum math
+
+        if self.data.len() != other.data.len() {
+            return false;
+        }
+
+        self.data
+            .iter()
+            .zip(other.data.iter())
+            .all(|(a, b)| a.approx_eq(b, epsilon))
+    }
+
+    pub fn is_physically_equivalent(&self, other: &StateVec) -> bool {
+        let overlap = self.inner(other);
+        // If the absolute overlap squared is 1, they are the same state
+        (overlap.abs2() - 1.0).abs() < 1e-10
     }
 }
