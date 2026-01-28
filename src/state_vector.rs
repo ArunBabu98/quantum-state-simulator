@@ -30,6 +30,39 @@ fn basis_states_are_orthogonal() {
     assert!(ip.abs2() < 1e-10);
 }
 
+#[test]
+fn tensor_product_dimension_doubles() {
+    let a = StateVec::basis_zero();
+    let b = StateVec::basis_one();
+    let ab = a.tensor(&b);
+    assert_eq!(ab.data.len(), 4);
+}
+
+#[test]
+fn tensor_product_basis_states() {
+    let zero = StateVec::basis_zero();
+    let one = StateVec::basis_one();
+
+    let zero_one = zero.tensor(&one);
+
+    let expected = StateVec::from(vec![
+        Complex::new(0.0, 0.0),
+        Complex::new(1.0, 0.0),
+        Complex::new(0.0, 0.0),
+        Complex::new(0.0, 0.0),
+    ]);
+
+    assert!(zero_one.approx_eq(&expected));
+}
+
+#[test]
+fn tensor_product_preserves_norm() {
+    let a = StateVec::basis_zero();
+    let b = StateVec::basis_one();
+    let ab = a.tensor(&b);
+    assert!((ab.norm2() - 1.0).abs() < 1e-10);
+}
+
 pub struct StateVec {
     pub data: Vec<Complex>,
 }
@@ -86,5 +119,16 @@ impl StateVec {
         let overlap = self.inner(other);
         // If the absolute overlap squared is 1, they are the same state
         (overlap.abs2() - 1.0).abs() < 1e-10
+    }
+
+    pub fn tensor(&self, other: &StateVec) -> StateVec {
+        let a = self.data[0];
+        let b = self.data[1];
+        let c = other.data[0];
+        let d = other.data[1];
+
+        Self {
+            data: vec![a * c, a * d, b * c, b * d],
+        }
     }
 }
