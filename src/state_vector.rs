@@ -1,4 +1,6 @@
-use crate::complex_math::Complex;
+use rand::Rng;
+
+use crate::{complex_math::Complex, gates::Gate};
 
 /*---------tests------------*/
 #[test]
@@ -63,6 +65,36 @@ fn tensor_product_preserves_norm() {
     assert!((ab.norm2() - 1.0).abs() < 1e-10);
 }
 
+#[test]
+fn measurement_of_basis_zero_is_deterministic() {
+    let mut psi = StateVec::basis_zero();
+    let result = psi.measure();
+    assert_eq!(result, 0);
+    assert!(psi.approx_eq(&StateVec::basis_zero()));
+}
+
+#[test]
+fn measurement_collapses_superposition() {
+    let h = Gate::hadamard();
+    let mut psi = h.apply(&StateVec::basis_zero());
+
+    let _ = psi.measure();
+
+    // After measurement, must be basis state
+    let is_zero = psi.approx_eq(&StateVec::basis_zero());
+    let is_one = psi.approx_eq(&StateVec::basis_one());
+
+    assert!(is_zero || is_one);
+}
+
+#[test]
+fn repeated_measurement_is_stable() {
+    let mut psi = StateVec::basis_one();
+    let first = psi.measure();
+    let second = psi.measure();
+    assert_eq!(first, second);
+}
+
 pub struct StateVec {
     pub data: Vec<Complex>,
 }
@@ -73,9 +105,8 @@ impl StateVec {
     }
 
     pub fn norm2(&self) -> f64 {
-        self.data[0].abs2() + self.data[1].abs2()
+        self.data.iter().map(|c| c.abs2()).sum()
     }
-
     pub fn normalize(&mut self) {
         let norm_facor = self.norm2().sqrt();
         if norm_facor > 0.0 {
@@ -131,4 +162,29 @@ impl StateVec {
             data: vec![a * c, a * d, b * c, b * d],
         }
     }
+    pub fn measure(&mut self) -> usize {
+        let mut rng = rand::rng();
+        let r = rng.random_range(0.0..1.0);
+
+        let mut cumulative_probability = 0.0;
+        let mut measured_index = 0;
+        for (i, amplitude) in self.data.iter().enumerate() {
+            cumulative_probability += amplitude.abs2();
+            if r < cumulative_probability {
+                measured_index = i;
+                break;
+            }
+        }
+        for i in 0..self.data.len() {
+            if i == measured_index {
+                self.data[i] = Complex::new(1.0, 0.0);
+            } else {
+                self.data[i] = Complex::new(0.0, 0.0);
+            }
+        }
+
+        measured_index
+    }
+
+    // pub fn measure_qubit(&mut self, qubit: usize) -> usize{};
 }
