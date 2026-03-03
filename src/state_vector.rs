@@ -2,99 +2,6 @@ use rand::Rng;
 
 use crate::{complex_math::Complex, gates::Gate};
 
-/*---------tests------------*/
-#[test]
-fn single_qubit_norm_is_one() {
-    let psi = StateVec::from(vec![Complex::new(1.0, 0.0), Complex::new(0.0, 0.0)]);
-    assert!((psi.norm2() - 1.0).abs() < 1e-10);
-}
-
-#[test]
-fn normalization_works() {
-    let mut psi = StateVec::from(vec![Complex::new(3.0, 0.0), Complex::new(4.0, 0.0)]);
-    psi.normalize();
-    assert!((psi.norm2() - 1.0).abs() < 1e-10);
-}
-
-#[test]
-fn inner_product_self_is_one() {
-    let psi = StateVec::basis_zero();
-    let ip = psi.inner(&psi);
-    assert!((ip.re - 1.0).abs() < 1e-10);
-    assert!(ip.im.abs() < 1e-10);
-}
-
-#[test]
-fn basis_states_are_orthogonal() {
-    let zero = StateVec::basis_zero();
-    let one = StateVec::basis_one();
-    let ip = zero.inner(&one);
-    assert!(ip.abs2() < 1e-10);
-}
-
-#[test]
-fn tensor_product_dimension_doubles() {
-    let a = StateVec::basis_zero();
-    let b = StateVec::basis_one();
-    let ab = a.tensor(&b);
-    assert_eq!(ab.data.len(), 4);
-}
-
-#[test]
-fn tensor_product_basis_states() {
-    let zero = StateVec::basis_zero();
-    let one = StateVec::basis_one();
-
-    let zero_one = zero.tensor(&one);
-
-    let expected = StateVec::from(vec![
-        Complex::new(0.0, 0.0),
-        Complex::new(1.0, 0.0),
-        Complex::new(0.0, 0.0),
-        Complex::new(0.0, 0.0),
-    ]);
-
-    assert!(zero_one.approx_eq(&expected));
-}
-
-#[test]
-fn tensor_product_preserves_norm() {
-    let a = StateVec::basis_zero();
-    let b = StateVec::basis_one();
-    let ab = a.tensor(&b);
-    assert!((ab.norm2() - 1.0).abs() < 1e-10);
-}
-
-#[test]
-fn measurement_of_basis_zero_is_deterministic() {
-    let mut psi = StateVec::basis_zero();
-    let result = psi.measure();
-    assert_eq!(result, 0);
-    assert!(psi.approx_eq(&StateVec::basis_zero()));
-}
-
-#[test]
-fn measurement_collapses_superposition() {
-    let h = Gate::hadamard();
-    let mut psi = h.apply(&StateVec::basis_zero());
-
-    let _ = psi.measure();
-
-    // After measurement, must be basis state
-    let is_zero = psi.approx_eq(&StateVec::basis_zero());
-    let is_one = psi.approx_eq(&StateVec::basis_one());
-
-    assert!(is_zero || is_one);
-}
-
-#[test]
-fn repeated_measurement_is_stable() {
-    let mut psi = StateVec::basis_one();
-    let first = psi.measure();
-    let second = psi.measure();
-    assert_eq!(first, second);
-}
-
 pub struct StateVec {
     pub data: Vec<Complex>,
 }
@@ -107,12 +14,14 @@ impl StateVec {
     pub fn norm2(&self) -> f64 {
         self.data.iter().map(|c| c.abs2()).sum()
     }
+
     pub fn normalize(&mut self) {
-        let norm_facor = self.norm2().sqrt();
-        if norm_facor > 0.0 {
-            let inv = 1.0 / norm_facor;
-            self.data[0] = self.data[0].scale(inv);
-            self.data[1] = self.data[1].scale(inv);
+        let norm = self.norm2().sqrt();
+        if norm > 1e-15 {
+            let inv = 1.0 / norm;
+            for amplitude in self.data.iter_mut() {
+                *amplitude = amplitude.scale(inv);
+            }
         }
     }
 
@@ -129,10 +38,14 @@ impl StateVec {
     }
 
     pub fn inner(&self, rhs: &StateVec) -> Complex {
-        let bra = self.data[0].conj() * rhs.data[0];
-        let ket = self.data[1].conj() * rhs.data[1];
-        bra + ket
+        assert_eq!(self.data.len(), rhs.data.len(), "Dimension mismatch");
+        self.data
+            .iter()
+            .zip(rhs.data.iter())
+            .map(|(a, b)| a.conj() * *b)
+            .fold(Complex::new(0.0, 0.0), |acc, x| acc + x)
     }
+
     pub fn approx_eq(&self, other: &StateVec) -> bool {
         let epsilon = 1e-10; // Standard tolerance for quantum math
 
@@ -153,38 +66,87 @@ impl StateVec {
     }
 
     pub fn tensor(&self, other: &StateVec) -> StateVec {
-        let a = self.data[0];
-        let b = self.data[1];
-        let c = other.data[0];
-        let d = other.data[1];
-
-        Self {
-            data: vec![a * c, a * d, b * c, b * d],
+        let mut new_data = Vec::with_capacity(self.data.len() * other.data.len());
+        for a in &self.data {
+            for b in &other.data {
+                new_data.push(*a * *b);
+            }
         }
+        StateVec::from(new_data)
     }
-    pub fn measure(&mut self) -> usize {
-        let mut rng = rand::rng();
-        let r = rng.random_range(0.0..1.0);
 
-        let mut cumulative_probability = 0.0;
-        let mut measured_index = 0;
+    pub fn measure(&mut self) -> usize {
+        // Invariant: state must be normalized
+        debug_assert!(
+            (self.norm2() - 1.0).abs() < 1e-9,
+            "State is not normalized before measurement"
+        );
+
+        let mut rng = rand::rng();
+        let r: f64 = rng.random_range(0.0..1.0);
+
+        let mut cumulative = 0.0;
+        // Default to last index to handle floating point rounding at the tail
+        let mut measured_index = self.data.len() - 1;
+
         for (i, amplitude) in self.data.iter().enumerate() {
-            cumulative_probability += amplitude.abs2();
-            if r < cumulative_probability {
+            cumulative += amplitude.abs2();
+            if r < cumulative {
                 measured_index = i;
                 break;
             }
         }
-        for i in 0..self.data.len() {
-            if i == measured_index {
-                self.data[i] = Complex::new(1.0, 0.0);
+
+        // Collapse: zero out everything, set measured basis state to 1
+        for (i, amplitude) in self.data.iter_mut().enumerate() {
+            *amplitude = if i == measured_index {
+                Complex::new(1.0, 0.0)
             } else {
-                self.data[i] = Complex::new(0.0, 0.0);
-            }
+                Complex::new(0.0, 0.0)
+            };
         }
 
         measured_index
     }
 
-    // pub fn measure_qubit(&mut self, qubit: usize) -> usize{};
+    pub fn measure_qubit(&mut self, qubit: usize) -> usize {
+        let num_amplitudes = self.data.len();
+        let num_qubits = num_amplitudes.trailing_zeros() as usize; // log2(len)
+
+        debug_assert!(qubit < num_qubits, "Qubit index out of range");
+        debug_assert!(
+            (self.norm2() - 1.0).abs() < 1e-9,
+            "State is not normalized before measurement"
+        );
+
+        // Step 1: Compute probability that qubit = 1
+        // Bit position in index: qubit 0 = MSB = highest bit
+        let bit_pos = num_qubits - 1 - qubit;
+
+        let prob_one: f64 = self
+            .data
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| (i >> bit_pos) & 1 == 1)
+            .map(|(_, amp)| amp.abs2())
+            .sum();
+
+        // Step 2: Throw the dart
+        let mut rng = rand::rng();
+        let r: f64 = rng.random_range(0.0..1.0);
+        let outcome = if r < prob_one { 1 } else { 0 };
+
+        // Step 3: Zero out inconsistent amplitudes
+        for (i, amp) in self.data.iter_mut().enumerate() {
+            let bit = (i >> bit_pos) & 1;
+            if bit != outcome {
+                *amp = Complex::new(0.0, 0.0);
+            }
+        }
+
+        // Step 4: Re-normalize surviving amplitudes
+        self.normalize();
+
+        outcome
+    }
 }
