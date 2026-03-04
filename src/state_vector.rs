@@ -59,6 +59,7 @@ impl StateVec {
             .all(|(a, b)| a.approx_eq(b, epsilon))
     }
 
+    #[allow(dead_code)]
     pub fn is_physically_equivalent(&self, other: &StateVec) -> bool {
         let overlap = self.inner(other);
         // If the absolute overlap squared is 1, they are the same state
@@ -73,6 +74,12 @@ impl StateVec {
             }
         }
         StateVec::from(new_data)
+    }
+
+    pub fn zero_state(n: usize) -> StateVec {
+        let mut data = vec![Complex::new(0.0, 0.0); 1 << n];
+        data[0] = Complex::new(1.0, 0.0);
+        StateVec { data }
     }
 
     pub fn measure(&mut self) -> usize {

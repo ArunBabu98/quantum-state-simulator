@@ -12,6 +12,7 @@ Invariants
 
 use crate::{complex_math::Complex, state_vector::StateVec};
 
+#[derive(Clone)]
 pub struct Gate {
     pub data: Vec<Vec<Complex>>,
 }
@@ -143,5 +144,40 @@ impl Gate {
                 vec![zero, zero, zero, Complex::new(-1.0, 0.0)],
             ],
         }
+    }
+
+    pub fn tensor_product(gate1: &Gate, gate2: &Gate) -> Gate {
+        let n = gate1.data.len();
+        let m = gate2.data.len();
+
+        let mut data = vec![vec![Complex::new(0.0, 0.0); n * m]; n * m];
+
+        for i in 0..n {
+            for j in 0..n {
+                for k in 0..m {
+                    for l in 0..m {
+                        data[i * m + k][j * m + l] = gate1.data[i][j] * gate2.data[k][l]
+                    }
+                }
+            }
+        }
+        Gate { data }
+    }
+
+    pub fn lift(gate: &Gate, target: usize, n: usize) -> Gate {
+        let identity = Self::identity();
+
+        let mut result = if target == 0 {
+            gate.clone()
+        } else {
+            identity.clone()
+        };
+
+        for i in 1..n {
+            let next_gate = if i == target { gate } else { &identity };
+            result = Self::tensor_product(&result, next_gate);
+        }
+
+        result
     }
 }

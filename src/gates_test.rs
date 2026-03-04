@@ -1,5 +1,5 @@
 #[cfg(test)]
-mod GatesTest {
+mod gate_test {
     use crate::{complex_math::Complex, gates::Gate, state_vector::StateVec};
 
     #[test]
@@ -232,5 +232,76 @@ mod GatesTest {
 
         let out = t.apply(&psi);
         assert!((out.norm2() - 1.0).abs() < 1e-10);
+    }
+}
+
+#[cfg(test)]
+mod gate_tensor_tests {
+    use crate::{complex_math::Complex, gates::Gate, state_vector::StateVec};
+
+    // H⊗I applied to |00⟩ should give (1/√2)(|00⟩ + |10⟩)
+    #[test]
+    fn tensor_h_i_on_00() {
+        let hi = Gate::tensor_product(&Gate::hadamard(), &Gate::identity());
+        let psi = StateVec::zero_state(2);
+        let result = hi.apply(&psi);
+        let inv_sqrt2 = 1.0 / 2.0_f64.sqrt();
+        let expected = StateVec::from(vec![
+            Complex::new(inv_sqrt2, 0.0), // |00⟩
+            Complex::new(0.0, 0.0),
+            Complex::new(inv_sqrt2, 0.0), // |10⟩
+            Complex::new(0.0, 0.0),
+        ]);
+        assert!(result.approx_eq(&expected));
+    }
+
+    // I⊗H applied to |00⟩ should give (1/√2)(|00⟩ + |01⟩)
+    #[test]
+    fn tensor_i_h_on_00() {
+        let ih = Gate::tensor_product(&Gate::identity(), &Gate::hadamard());
+        let psi = StateVec::zero_state(2);
+        let result = ih.apply(&psi);
+        let inv_sqrt2 = 1.0 / 2.0_f64.sqrt();
+        let expected = StateVec::from(vec![
+            Complex::new(inv_sqrt2, 0.0), // |00⟩
+            Complex::new(inv_sqrt2, 0.0), // |01⟩
+            Complex::new(0.0, 0.0),
+            Complex::new(0.0, 0.0),
+        ]);
+        assert!(result.approx_eq(&expected));
+    }
+
+    // Tensor product of two 2x2 gates produces a 4x4 gate
+    #[test]
+    fn tensor_product_dimension() {
+        let g = Gate::tensor_product(&Gate::hadamard(), &Gate::pauli_x());
+        assert_eq!(g.data.len(), 4);
+        assert!(g.data.iter().all(|row| row.len() == 4));
+    }
+
+    // (A⊗B)(C⊗D) = (AC)⊗(BD) — mixed product property
+    #[test]
+    fn tensor_product_mixed_product_property() {
+        let psi = StateVec::zero_state(2);
+
+        // Apply H⊗X as one tensor gate
+        let hx = Gate::tensor_product(&Gate::hadamard(), &Gate::pauli_x());
+        let result_a = hx.apply(&psi);
+
+        // Apply H to qubit 0, X to qubit 1 via lift — must match
+        let lifted_h = Gate::lift(&Gate::hadamard(), 0, 2);
+        let lifted_x = Gate::lift(&Gate::pauli_x(), 1, 2);
+        let result_b = lifted_x.apply(&lifted_h.apply(&psi));
+
+        assert!(result_a.approx_eq(&result_b));
+    }
+
+    // I⊗I = identity on 2-qubit space
+    #[test]
+    fn tensor_identity_is_identity() {
+        let ii = Gate::tensor_product(&Gate::identity(), &Gate::identity());
+        let psi = StateVec::zero_state(2);
+        let result = ii.apply(&psi);
+        assert!(result.approx_eq(&psi));
     }
 }
