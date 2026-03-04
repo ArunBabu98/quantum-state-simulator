@@ -305,3 +305,81 @@ mod gate_tensor_tests {
         assert!(result.approx_eq(&psi));
     }
 }
+
+#[cfg(test)]
+mod gate_lift_tests {
+    use crate::{complex_math::Complex, gates::Gate, state_vector::StateVec};
+
+    // Lifting identity to any qubit does nothing
+    #[test]
+    fn lift_identity_is_noop_qubit0() {
+        let psi = StateVec::zero_state(3);
+        let lifted = Gate::lift(&Gate::identity(), 0, 3);
+        assert!(lifted.apply(&psi).approx_eq(&psi));
+    }
+
+    #[test]
+    fn lift_identity_is_noop_qubit1() {
+        let psi = StateVec::zero_state(3);
+        let lifted = Gate::lift(&Gate::identity(), 1, 3);
+        assert!(lifted.apply(&psi).approx_eq(&psi));
+    }
+
+    #[test]
+    fn lift_identity_is_noop_qubit2() {
+        let psi = StateVec::zero_state(3);
+        let lifted = Gate::lift(&Gate::identity(), 2, 3);
+        assert!(lifted.apply(&psi).approx_eq(&psi));
+    }
+
+    // Lifting X to qubit 0 of |000⟩ gives |100⟩
+    #[test]
+    fn lift_x_to_qubit0_flips_first() {
+        let psi = StateVec::zero_state(3); // |000⟩ = index 0
+        let lifted = Gate::lift(&Gate::pauli_x(), 0, 3);
+        let result = lifted.apply(&psi);
+        // |100⟩ = index 4 in 3-qubit system
+        assert!((result.data[4].re - 1.0).abs() < 1e-10);
+        assert!((result.norm2() - 1.0).abs() < 1e-10);
+    }
+
+    // Lifting X to qubit 2 of |000⟩ gives |001⟩
+    #[test]
+    fn lift_x_to_qubit2_flips_last() {
+        let psi = StateVec::zero_state(3); // |000⟩ = index 0
+        let lifted = Gate::lift(&Gate::pauli_x(), 2, 3);
+        let result = lifted.apply(&psi);
+        // |001⟩ = index 1
+        assert!((result.data[1].re - 1.0).abs() < 1e-10);
+    }
+
+    // Lifting H to qubit 1 of 3-qubit state produces correct superposition
+    #[test]
+    fn lift_h_to_middle_qubit() {
+        let psi = StateVec::zero_state(3); // |000⟩
+        let lifted = Gate::lift(&Gate::hadamard(), 1, 3);
+        let result = lifted.apply(&psi);
+        // Should give (1/√2)(|000⟩ + |010⟩) = amplitudes at index 0 and 2
+        let inv_sqrt2 = 1.0 / 2.0_f64.sqrt();
+        assert!((result.data[0].re - inv_sqrt2).abs() < 1e-10);
+        assert!((result.data[2].re - inv_sqrt2).abs() < 1e-10);
+        assert!((result.norm2() - 1.0).abs() < 1e-10);
+    }
+
+    // Lifted gate produces correct output dimension
+    #[test]
+    fn lift_produces_correct_dimension() {
+        let g = Gate::lift(&Gate::hadamard(), 1, 3);
+        assert_eq!(g.data.len(), 8);
+        assert!(g.data.iter().all(|row| row.len() == 8));
+    }
+
+    // H lifted to qubit 0 then again = identity (H is self-inverse)
+    #[test]
+    fn lift_h_twice_is_identity() {
+        let psi = StateVec::zero_state(2);
+        let lh = Gate::lift(&Gate::hadamard(), 0, 2);
+        let result = lh.apply(&lh.apply(&psi));
+        assert!(result.approx_eq(&psi));
+    }
+}
