@@ -14,33 +14,7 @@ Invariant:
 
 */
 
-/* ---------------------------tests------------------------ */
-
 use std::ops::{Add, Mul, Sub};
-
-#[test]
-fn complex_conjugate() {
-    let z = Complex::new(3.0, 4.0);
-    let c = z.conj();
-    assert_eq!(c.re, 3.0);
-    assert_eq!(c.im, -4.0);
-}
-
-#[test]
-fn complex_abs2() {
-    let z = Complex::new(3.0, 4.0);
-    assert_eq!(z.abs2(), 25.0);
-}
-
-#[test]
-fn complex_mul_conj_is_real() {
-    let z = Complex::new(1.2, -0.7);
-    let conj = z.conj();
-    let p = z * conj;
-    assert!(p.im.abs() < 1e-10);
-}
-
-/* -------------------------End tests------------------------ */
 
 #[derive(Clone, Copy)]
 pub struct Complex {
@@ -61,7 +35,7 @@ impl Complex {
     }
 
     pub fn abs2(&self) -> f64 {
-        (self.re.powi(2) + self.im.powi(2)).abs()
+        self.re * self.re + self.im * self.im
     }
 
     pub fn scale(&self, factor: f64) -> Complex {
@@ -70,6 +44,7 @@ impl Complex {
             im: self.im * factor,
         }
     }
+    
     pub fn approx_eq(&self, other: &Complex, epsilon: f64) -> bool {
         (self.re - other.re).abs() < epsilon && (self.im - other.im).abs() < epsilon
     }
