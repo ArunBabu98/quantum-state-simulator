@@ -59,7 +59,6 @@ impl StateVec {
             .all(|(a, b)| a.approx_eq(b, epsilon))
     }
 
-    #[allow(dead_code)]
     pub fn is_physically_equivalent(&self, other: &StateVec) -> bool {
         let overlap = self.inner(other);
         // If the absolute overlap squared is 1, they are the same state

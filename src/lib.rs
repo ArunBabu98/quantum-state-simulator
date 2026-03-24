@@ -1,3 +1,5 @@
+mod circuit;
+mod circuit_test;
 mod complex_math;
 mod complex_math_test;
 mod gates;

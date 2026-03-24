@@ -383,3 +383,91 @@ mod gate_lift_tests {
         assert!(result.approx_eq(&psi));
     }
 }
+
+#[cfg(test)]
+mod controlled_gate_tests {
+    use crate::{complex_math::Complex, gates::Gate, state_vector::StateVec};
+
+    // Controlled-X (built generically) must equal hardcoded CNOT
+    #[test]
+    fn controlled_x_equals_cnot() {
+        let cx = Gate::controlled(&Gate::pauli_x());
+        let cnot = Gate::cnot();
+        let psi = StateVec::zero_state(2);
+
+        // Test on all 4 basis states
+        for idx in 0..4 {
+            let mut state_data = vec![Complex::new(0.0, 0.0); 4];
+            state_data[idx] = Complex::new(1.0, 0.0);
+            let state = StateVec::from(state_data);
+
+            assert!(
+                cx.apply(&state).approx_eq(&cnot.apply(&state)),
+                "Mismatch on basis state |{:02b}⟩",
+                idx
+            );
+        }
+    }
+
+    // Controlled-Z (built generically) must equal hardcoded CZ
+    #[test]
+    fn controlled_z_equals_cz() {
+        let cz_generic = Gate::controlled(&Gate::pauli_z());
+        let cz = Gate::cz();
+        for idx in 0..4 {
+            let mut state_data = vec![Complex::new(0.0, 0.0); 4];
+            state_data[idx] = Complex::new(1.0, 0.0);
+            let state = StateVec::from(state_data);
+            assert!(cz_generic.apply(&state).approx_eq(&cz.apply(&state)));
+        }
+    }
+
+    // Controlled-U with control=|0⟩ never applies U
+    #[test]
+    fn controlled_gate_noop_when_control_zero() {
+        let cu = Gate::controlled(&Gate::pauli_x());
+        // |00⟩ and |01⟩ both have control=0, should be unchanged
+        for idx in [0usize, 1usize] {
+            let mut state_data = vec![Complex::new(0.0, 0.0); 4];
+            state_data[idx] = Complex::new(1.0, 0.0);
+            let state = StateVec::from(state_data.clone());
+            let result = cu.apply(&state);
+            assert!((result.data[idx].re - 1.0).abs() < 1e-10);
+        }
+    }
+
+    // Controlled-U with control=|1⟩ always applies U
+    #[test]
+    fn controlled_gate_applies_when_control_one() {
+        let cx = Gate::controlled(&Gate::pauli_x());
+        // |10⟩ (index 2): control=1, target=0 → should flip to |11⟩ (index 3)
+        let mut state_data = vec![Complex::new(0.0, 0.0); 4];
+        state_data[2] = Complex::new(1.0, 0.0);
+        let state = StateVec::from(state_data);
+        let result = cx.apply(&state);
+        assert!((result.data[3].re - 1.0).abs() < 1e-10);
+    }
+
+    // Controlled-I = identity on full space
+    #[test]
+    fn controlled_identity_is_noop() {
+        let ci = Gate::controlled(&Gate::identity());
+        let psi = StateVec::zero_state(2);
+        assert!(ci.apply(&psi).approx_eq(&psi));
+    }
+
+    // Controlled-H is unitary: norm must be preserved
+    #[test]
+    fn controlled_h_preserves_norm() {
+        let ch = Gate::controlled(&Gate::hadamard());
+        let inv_sqrt2 = 1.0 / 2.0_f64.sqrt();
+        let psi = StateVec::from(vec![
+            Complex::new(inv_sqrt2, 0.0),
+            Complex::new(0.0, 0.0),
+            Complex::new(inv_sqrt2, 0.0),
+            Complex::new(0.0, 0.0),
+        ]);
+        let result = ch.apply(&psi);
+        assert!((result.norm2() - 1.0).abs() < 1e-10);
+    }
+}
